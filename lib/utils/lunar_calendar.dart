@@ -190,6 +190,13 @@ class LunarCalendar {
   /// グレゴリオ暦 → 旧暦変換
   /// [date]以前の最も近い朔日エントリを線形探索で特定し、
   /// 旧暦月・日・閏月フラグを返す。
+  ///
+  /// 【閏月の六曜計算について】
+  /// 閏月では六曜はリセットされず、直前の通常月から連続する。
+  /// そのため閏月エントリに当たった場合は、直前の非閏月エントリの
+  /// 朔日を起点とした通算日数で旧暦日を計算する。
+  /// 例: 2028年閏旧暦5月1日(2028/06/21) は、通常旧暦5月1日(2028/05/24)
+  ///     からの通算29日目として計算 → (5+29)%6=4=先負 ✅
   static LunarDate fromGregorian(DateTime date) {
     final target = DateTime(date.year, date.month, date.day);
 
@@ -211,10 +218,32 @@ class LunarCalendar {
     }
 
     final entry = _sakuTable[idx];
-    final sakuDate = DateTime(entry[0] as int, entry[1] as int, entry[2] as int);
-    final lunarDay = target.difference(sakuDate).inDays + 1;
-    final lunarMonth = entry[3] as int;
     final isLeap = entry[4] as bool;
+
+    // --- 閏月処理 ---
+    // 閏月エントリに当たった場合、六曜は直前の非閏月エントリから連続する。
+    // 直前の非閏月エントリの朔日を起点に通算日数を計算する。
+    DateTime sakuDate;
+    int lunarMonth;
+    if (isLeap) {
+      // 直前の非閏月エントリを探す
+      int prevIdx = idx - 1;
+      while (prevIdx >= 0 && (_sakuTable[prevIdx][4] as bool)) {
+        prevIdx--;
+      }
+      final prevEntry = prevIdx >= 0 ? _sakuTable[prevIdx] : entry;
+      sakuDate = DateTime(
+        prevEntry[0] as int,
+        prevEntry[1] as int,
+        prevEntry[2] as int,
+      );
+      lunarMonth = prevEntry[3] as int;
+    } else {
+      sakuDate = DateTime(entry[0] as int, entry[1] as int, entry[2] as int);
+      lunarMonth = entry[3] as int;
+    }
+
+    final lunarDay = target.difference(sakuDate).inDays + 1;
 
     // 旧暦年: 直近の旧暦1月1日（春節）エントリのグレゴリオ年を旧暦年とする
     int lunarYear = entry[0] as int;
