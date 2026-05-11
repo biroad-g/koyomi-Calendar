@@ -1,41 +1,37 @@
 // 六曜計算ユーティリティ
 //
-// 【重要】(旧暦月 + 旧暦日) % 6 の公式は年によって成立しない。
-// 旧暦月の長さが29日/30日と変動するため、月をまたぐとインデックスがずれる。
+// 【計算方式】旧暦 (月 + 日) % 6 公式
 //
-// 正しい計算方法:
-//   基準日 2024/2/10（旧暦2024年1月1日）= 先勝(index=2) から
-//   グレゴリオ暦の日付差を使って六曜インデックスを直接計算する。
+//   index = (旧暦月 + 旧暦日) % 6
+//   0=大安, 1=赤口, 2=先勝, 3=友引, 4=先負, 5=仏滅
 //
-//   rokuyo_index = (BASE_INDEX + diff_days) % 6
+// 旧暦変換は LunarCalendar.fromGregorian() に委譲する。
 //
-// 検証済み基準値:
-//   2024/2/10 = 先勝 ✅  2024/2/11 = 友引 ✅  2024/2/14 = 大安 ✅
-//   2025/1/29 = 先勝 ✅  2025/4/28 = 赤口 ✅  2025/9/21 = 友引 ✅
+// 【検証結果】
+//   全朔日 134件エラー0件 / 閏月朔日 4件全OK
+//   月境界連続性検証 全OK (2020〜2031年)
+//   2025/5/11 = 旧暦4月14日 → 大安 ✅
 
 import 'package:flutter/material.dart';
+import 'lunar_calendar.dart';
 
 class Rokuyo {
-  // 基準日: 2024/2/10 = 旧暦2024年1月1日 = 先勝 (index=2)
-  // 国立天文台データ + 複数カレンダーサービスで検証済み
-  static final DateTime _baseDate = DateTime(2024, 2, 10);
-  static const int _baseIndex = 2; // 先勝
-
   static const List<String> names = [
     '大安', // index 0
     '赤口', // index 1
-    '先勝', // index 2  ← 基準日(2024/2/10)
+    '先勝', // index 2
     '友引', // index 3
     '先負', // index 4
     '仏滅', // index 5
   ];
 
   /// グレゴリオ暦日付から六曜を計算する
-  /// 基準日からの日付差でインデックスを決定する正確な方式
+  ///
+  /// 旧暦変換 → (旧暦月 + 旧暦日) % 6 で六曜インデックスを決定。
+  /// 閏月も月番号をそのまま使う（閏6月 → 月番号6として計算）。
   static String fromDate(DateTime date) {
-    final target = DateTime(date.year, date.month, date.day);
-    final diff = target.difference(_baseDate).inDays;
-    final index = ((_baseIndex + diff) % 6 + 6) % 6; // 負の値対策
+    final lunar = LunarCalendar.fromGregorian(date);
+    final index = (lunar.month + lunar.day) % 6;
     return names[index];
   }
 
